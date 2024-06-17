@@ -1,8 +1,7 @@
 from datetime import datetime
-import uuid
 from logging import Logger
 from lib.kafka_connect.kafka_connectors import KafkaConsumer, KafkaProducer
-from dds_loader.repository.dds_repository import DdsRepository
+from dds_loader.repository.dds_repository import DdsRepository, OrderDdsBuilder
 
 
 class DdsMessageProcessor:
@@ -27,17 +26,29 @@ class DdsMessageProcessor:
             if msg is None:
                 break
             if msg.get("object_id"):
-                self._dds_repository.h_user_insert(msg["payload"]["user"]["id"])
-                self._dds_repository.h_restaurant_insert(msg["payload"]["restaurant"]["id"])
-                self._dds_repository.h_order_insert(msg["payload"]["id"], msg["payload"]["date"])
+                order_dds_buider = OrderDdsBuilder(msg)
+                self._dds_repository.h_user_insert(order_dds_buider.h_user())
+                for product in order_dds_buider.h_product():
+                    self._dds_repository.h_product_insert(product)
+                for category in order_dds_buider.h_category():
+                    self._dds_repository.h_category_insert(category)
+                self._dds_repository.h_restaurant_insert(order_dds_buider.h_restaurant())
+                self._dds_repository.h_order_insert(order_dds_buider.h_order())
+                for l_order_product in order_dds_buider.l_order_product():
+                    self._dds_repository.l_order_product_insert(l_order_product)
+                for l_product_restaurant in order_dds_buider.l_product_restaurant():
+                    self._dds_repository.l_product_restaurant_insert(l_product_restaurant)
+                for l_product_category in order_dds_buider.l_product_category():
+                    self._dds_repository.l_product_category_insert(l_product_category)
+                self._dds_repository.l_order_user_insert(order_dds_buider.l_order_user())
+                self._dds_repository.s_user_names_insert(order_dds_buider.s_user_names())
+                for s_product_names in order_dds_buider.s_product_names():
+                    self._dds_repository.s_product_names_insert(s_product_names)
+                self._dds_repository.s_restaurant_names_insert(order_dds_buider.s_restaurant_names())
+                self._dds_repository.s_order_cost_insert(order_dds_buider.s_order_cost())
+                self._dds_repository.s_order_status_insert(order_dds_buider.s_order_status())
+
                 for product in msg["payload"]["products"]:
-                    self._dds_repository.h_product_insert(product["id"])
-                    self._dds_repository.h_category_insert(product["category"])
-                    self._dds_repository.l_order_product_insert(msg["payload"]["id"], product["id"])
-                    self._dds_repository.l_product_restaurant_insert(msg["payload"]["restaurant"]["id"], product["id"])
-                    self._dds_repository.l_product_category_insert(product["category"], product["id"])
-                    self._dds_repository.s_product_names_insert(product["id"], product["name"])
-                    
                     message_user_product_counters = {
                         "type": "user_product_counters",
                         "user_id": msg["payload"]["user"]["id"],
@@ -52,13 +63,5 @@ class DdsMessageProcessor:
                         "category_name": product["category"]
                     }
                     self._producer.produce(message_user_category_counters)
-
-                self._dds_repository.l_order_user_insert(msg["payload"]["id"], msg["payload"]["user"]["id"])
-                self._dds_repository.s_user_names_insert(msg["payload"]["user"]["id"], msg["payload"]["user"]["name"], msg["payload"]["user"]["login"])
-                self._dds_repository.s_restaurant_names_insert(msg["payload"]["restaurant"]["id"], msg["payload"]["restaurant"]["name"])
-                self._dds_repository.s_order_cost_insert(msg["payload"]["id"], msg["payload"]["cost"], msg["payload"]["payment"])
-                self._dds_repository.s_order_status_insert(msg["payload"]["id"], msg["payload"]["status"])
-                
-                
 
         self._logger.info(f"{datetime.utcnow()}: FINISH")

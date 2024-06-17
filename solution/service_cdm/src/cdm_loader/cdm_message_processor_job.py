@@ -1,9 +1,8 @@
 from datetime import datetime
 from logging import Logger
-from uuid import UUID
 
 from lib.kafka_connect import KafkaConsumer
-from cdm_loader.repository.cdm_repository import CdmRepository
+from cdm_loader.repository.cdm_repository import CdmRepository, OrderCdmBuilder
 
 
 class CdmMessageProcessor:
@@ -27,9 +26,11 @@ class CdmMessageProcessor:
             self._logger.info(msg)
             if msg is None:
                 break
-            if msg.get("type") == "user_product_counters":
-                self._cdm_repository.user_product_counters_insert(msg["user_id"], msg["product_id"], msg["product_name"])
-            if msg.get("type") == "user_category_counters":
-                self._cdm_repository.user_category_counters_insert(msg["user_id"], msg["category_name"])
+            else:
+                order_cdm_builder = OrderCdmBuilder(msg)
+                if msg.get("type") == "user_product_counters":
+                    self._cdm_repository.user_product_counters_insert(order_cdm_builder.user_product_counters())
+                if msg.get("type") == "user_category_counters":
+                    self._cdm_repository.user_category_counters_insert(order_cdm_builder.user_category_counters())
 
         self._logger.info(f"{datetime.utcnow()}: FINISH")

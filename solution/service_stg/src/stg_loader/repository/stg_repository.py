@@ -1,34 +1,47 @@
+import os
 from datetime import datetime
+import json
+
+from pydantic import BaseModel
+from typing import Dict
 
 from lib.pg import PgConnect
+
+
+class OrderEvents(BaseModel):
+    object_id: int
+    object_type: str
+    sent_dttm: datetime
+    payload: str
+
+class OrderStgBuilder:
+    def __init__(self, dict: Dict) -> None:
+        self._dict = dict
+    def order_events(self) -> OrderEvents:
+        return OrderEvents(
+            object_id=self._dict["object_id"],
+            object_type=self._dict["object_type"],
+            sent_dttm=self._dict["sent_dttm"],
+            payload=json.dumps(self._dict["payload"])
+        )
 
 class StgRepository:
     def __init__(self, db: PgConnect) -> None:
         self._db = db
 
     def order_events_insert(self,
-                            object_id: int,
-                            object_type: str,
-                            sent_dttm: datetime,
-                            payload: str
+                            order_events: OrderEvents
                             ) -> None:
 
         with self._db.connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                        insert into stg.order_events (object_id, object_type, sent_dttm, payload)
-                        values (%(object_id)s, %(object_type)s, %(sent_dttm)s, %(payload)s)
-                        on conflict (object_id) do update
-                        set
-                            object_type = EXCLUDED.object_type,
-                            sent_dttm = EXCLUDED.sent_dttm,
-                            payload = EXCLUDED.payload;
-                    """,
-                    {
-                        'object_id': object_id,
-                        'object_type': object_type,
-                        'sent_dttm': sent_dttm,
-                        'payload': payload
-                    }
-                )
+                with open(os.path.dirname(os.path.abspath(__file__)) + "/sql/order_events_insert.sql", "r") as script:
+                    cur.execute(
+                        script.read(),
+                        {
+                            'object_id': order_events.object_id,
+                            'object_type': order_events.object_type,
+                            'sent_dttm': order_events.sent_dttm,
+                            'payload': order_events.payload
+                        }
+                    )

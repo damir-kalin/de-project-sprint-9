@@ -1,10 +1,10 @@
-import time
 from datetime import datetime
-import json
+
 from logging import Logger
+
 from lib.kafka_connect.kafka_connectors import KafkaConsumer, KafkaProducer 
 from lib.redis.redis_client import RedisClient
-from stg_loader.repository.stg_repository import StgRepository
+from stg_loader.repository.stg_repository import StgRepository, OrderStgBuilder
 
 class StgMessageProcessor:
     def __init__(self,
@@ -27,14 +27,15 @@ class StgMessageProcessor:
         self._logger.info(f"{datetime.utcnow()}: START")
 
         # Имитация работы. Здесь будет реализована обработка сообщений.
-        # time.sleep(2)
         for _ in range(self._batch_size):
             msg = self._consumer.consume()
 
             if msg is None:
                 break
-            if msg.get("object_id"):
-                self._stg_repository.order_events_insert(msg["object_id"], msg["object_type"], msg["sent_dttm"], json.dumps(msg["payload"]))
+            if "object_id" in msg:
+                self._logger.info(msg)
+                msg_insert_db = OrderStgBuilder(msg).order_events()
+                self._stg_repository.order_events_insert(msg_insert_db)
                 user_id = msg["payload"]["user"]["id"]
                 user_data = self._redis.get(user_id)
                 restaurant_id = msg["payload"]["restaurant"]["id"]

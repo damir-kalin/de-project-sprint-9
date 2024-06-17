@@ -11,3 +11,6 @@
 	* `git commit -m 'my best commit'`
 5. Обновите репозиторий в вашем GitHub-аккаунте:
 	* `git push origin main`
+
+<!-- Ссылка на Дашборд -->
+https://datalens.yandex/cz7ipe41vwaw0
